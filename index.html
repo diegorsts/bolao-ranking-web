@@ -587,9 +587,6 @@ function applyChartStyle() {
 
 function setCompareMode(on) {
   compareMode = on;
-  document.getElementById('btnAll').classList.toggle('hidden', on);
-  document.getElementById('btnTop5').classList.toggle('hidden', on);
-  document.getElementById('btnReset').classList.toggle('hidden', on);
   document.getElementById('btnCompareClear').classList.toggle('hidden', !on);
   document.getElementById('btnCompareToggle').classList.toggle('active', on);
   document.getElementById('dashboardHint').textContent = on
@@ -600,7 +597,6 @@ function setCompareMode(on) {
   } else {
     selectedCompare.clear();
   }
-  if (chartInstance) chartInstance.data.datasets.forEach(ds => ds.hidden = false);
   applyChartStyle();
 }
 
@@ -610,16 +606,19 @@ document.getElementById('btnCompareClear').addEventListener('click', () => {
   applyChartStyle();
 });
 document.getElementById('btnReset').addEventListener('click', () => {
+  setCompareMode(false);
   highlighted = null;
   if (chartInstance) chartInstance.data.datasets.forEach(ds => ds.hidden = false);
   applyChartStyle();
 });
 document.getElementById('btnAll').addEventListener('click', () => {
+  setCompareMode(false);
   highlighted = null;
   if (chartInstance) chartInstance.data.datasets.forEach(ds => ds.hidden = false);
   applyChartStyle();
 });
 document.getElementById('btnTop5').addEventListener('click', () => {
+  setCompareMode(false);
   highlighted = null;
   const top5 = currentParticipants.slice(0, 5);
   if (chartInstance) chartInstance.data.datasets.forEach(ds => ds.hidden = !top5.includes(ds.label));
