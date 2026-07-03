@@ -85,7 +85,8 @@ def scrape_current():
             continue
         points[row["name"]] = int(row["pts"])
         details[row["name"]] = {
-            k: (int(v) if v not in (None, "") else None) for k, v in row["details"].items()
+            "Pts": int(row["pts"]),
+            **{k: (int(v) if v not in (None, "") else None) for k, v in row["details"].items()},
         }
     return points, details
 
