@@ -102,6 +102,8 @@
     transition: all .15s ease;
   }
   .controls button:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-compare { margin-left: auto; border-color: var(--accent) !important; color: var(--accent) !important; }
+  .btn-compare.active { background: var(--accent) !important; color: #0f1420 !important; font-weight: 700; }
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   thead th {
     text-align: left;
@@ -248,7 +250,6 @@
 
   <div class="tabbar">
     <button class="tab-btn active" id="tabBtnDashboard">Dashboard</button>
-    <button class="tab-btn" id="tabBtnCompare">Comparar</button>
     <button class="tab-btn" id="tabBtnFull">Tabela completa</button>
   </div>
 
@@ -261,6 +262,7 @@
           <button id="btnAll">Mostrar todos</button>
           <button id="btnTop5">Somente Top 5</button>
           <button id="btnReset">Limpar destaque</button>
+          <button id="tabBtnCompare" class="btn-compare">Comparar</button>
         </div>
         <div class="chart-box">
           <canvas id="rankChart"></canvas>
