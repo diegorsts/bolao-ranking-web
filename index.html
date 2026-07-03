@@ -436,6 +436,13 @@ function startListeners() {
     if (snap.empty) return;
     const d = snap.docs[0].data();
     if (d.details) renderFullTable(d.details);
+    if (d.ts) {
+      const localTime = d.ts.toDate().toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+      document.getElementById('updatedAt').textContent = `Última coleta: ${localTime}`;
+    }
   });
 }
 
@@ -466,8 +473,6 @@ function renderDashboard(data) {
     return data[lastDate][b] - data[lastDate][a];
   });
   currentParticipants = participants;
-
-  document.getElementById('updatedAt').textContent = `Última coleta: ${fmtFull(lastDate)}`;
 
   colorOf = {};
   participants.forEach((p, i) => colorOf[p] = PALETTE[i % PALETTE.length]);
@@ -747,12 +752,6 @@ function fmtDate(d) {
   const [datePart, timePart] = d.split('T');
   const [y,m,day] = datePart.split('-');
   return hasTime ? `${day}/${m} ${timePart}` : `${day}/${m}`;
-}
-function fmtFull(d) {
-  const hasTime = d.includes('T');
-  const [datePart, timePart] = d.split('T');
-  const [y,m,day] = datePart.split('-');
-  return hasTime ? `${day}/${m}/${y} ${timePart}` : `${day}/${m}/${y}`;
 }
 </script>
 </body>
