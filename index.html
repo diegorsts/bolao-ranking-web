@@ -404,13 +404,15 @@ function renderDashboard(data) {
     applyHighlight();
   });
   document.getElementById('btnAll').addEventListener('click', () => {
+    highlighted = null;
     chart.data.datasets.forEach(ds => ds.hidden = false);
-    chart.update();
+    applyHighlight();
   });
   document.getElementById('btnTop5').addEventListener('click', () => {
+    highlighted = null;
     const top5 = participants.slice(0, 5);
     chart.data.datasets.forEach(ds => ds.hidden = !top5.includes(ds.label));
-    chart.update();
+    applyHighlight();
   });
 }
 
