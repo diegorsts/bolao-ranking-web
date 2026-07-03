@@ -125,6 +125,37 @@
   .table-scroll { max-height: 460px; overflow-y: auto; }
   footer { max-width: 1200px; margin: 24px auto 0; color: var(--muted); font-size: 12px; text-align: center; }
 
+  .tabbar {
+    max-width: 1200px;
+    margin: 0 auto 18px;
+    display: flex;
+    gap: 8px;
+  }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 9px 18px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .tab-btn:hover { color: var(--text); border-color: var(--accent); }
+  .tab-btn.active {
+    background: var(--panel-2);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  #tabFullTable { max-width: 1200px; margin: 0 auto; }
+  .full-table-scroll { overflow-x: auto; }
+  .full-table { font-size: 12.5px; white-space: nowrap; }
+  .full-table th, .full-table td { padding: 6px 10px; text-align: right; }
+  .full-table th:nth-child(1), .full-table td:nth-child(1) { text-align: center; }
+  .full-table th:nth-child(2), .full-table td:nth-child(2) { text-align: left; white-space: normal; }
+  .full-table tbody tr:hover { background: rgba(79,209,197,0.06); }
+
   #gate {
     min-height: 70vh;
     display: flex;
@@ -184,29 +215,51 @@
     </div>
   </header>
 
-  <div class="wrap">
-    <div class="card">
-      <h2>Trajetória de pontos</h2>
-      <div class="hint">Clique em um nome na tabela ao lado para destacar a linha. A coleta roda a cada 5 minutos e a tela atualiza sozinha, em tempo real, assim que um novo dado chega.</div>
-      <div class="controls">
-        <button id="btnAll">Mostrar todos</button>
-        <button id="btnTop5">Somente Top 5</button>
-        <button id="btnReset">Limpar destaque</button>
+  <div class="tabbar">
+    <button class="tab-btn active" id="tabBtnDashboard">Dashboard</button>
+    <button class="tab-btn" id="tabBtnFull">Tabela completa</button>
+  </div>
+
+  <div id="tabDashboard">
+    <div class="wrap">
+      <div class="card">
+        <h2>Trajetória de pontos</h2>
+        <div class="hint">Clique em um nome na tabela ao lado para destacar a linha. A coleta roda a cada 5 minutos e a tela atualiza sozinha, em tempo real, assim que um novo dado chega.</div>
+        <div class="controls">
+          <button id="btnAll">Mostrar todos</button>
+          <button id="btnTop5">Somente Top 5</button>
+          <button id="btnReset">Limpar destaque</button>
+        </div>
+        <div class="chart-box">
+          <canvas id="rankChart"></canvas>
+        </div>
       </div>
-      <div class="chart-box">
-        <canvas id="rankChart"></canvas>
+
+      <div class="card">
+        <h2>Classificação atual</h2>
+        <div class="hint">Ordenado pela pontuação mais recente</div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th class="rank-cell">#</th><th>Participante</th><th style="text-align:right">Pts</th></tr>
+            </thead>
+            <tbody id="rankBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
+  </div>
 
+  <div id="tabFullTable" class="hidden">
     <div class="card">
-      <h2>Classificação atual</h2>
-      <div class="hint">Ordenado pela pontuação mais recente</div>
-      <div class="table-scroll">
-        <table>
+      <h2>Tabela completa</h2>
+      <div class="hint">Todos os critérios de pontuação, igual à tela original do bolão. Atualiza em tempo real.</div>
+      <div class="table-scroll full-table-scroll">
+        <table class="full-table">
           <thead>
-            <tr><th class="rank-cell">#</th><th>Participante</th><th style="text-align:right">Pts</th></tr>
+            <tr id="fullTableHead"></tr>
           </thead>
-          <tbody id="rankBody"></tbody>
+          <tbody id="fullTableBody"></tbody>
         </table>
       </div>
     </div>
@@ -221,7 +274,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, query, orderBy, onSnapshot
+  getFirestore, collection, query, orderBy, onSnapshot, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Config pública do Firebase — não é segredo, a segurança vem das Firestore Rules.
@@ -255,9 +308,11 @@ document.getElementById('loginBtn').addEventListener('click', () => {
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
 
 let unsubscribeSnapshot = null;
+let unsubscribeLatest = null;
 
 onAuthStateChanged(auth, (user) => {
   if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  if (unsubscribeLatest) { unsubscribeLatest(); unsubscribeLatest = null; }
 
   if (!user) {
     gate.classList.remove('hidden');
@@ -286,6 +341,13 @@ onAuthStateChanged(auth, (user) => {
     errorBox.classList.remove('hidden');
     gate.classList.remove('hidden');
     appEl.classList.add('hidden');
+  });
+
+  const qLatest = query(collection(db, 'snapshots'), orderBy('ts', 'desc'), limit(1));
+  unsubscribeLatest = onSnapshot(qLatest, (snap) => {
+    if (snap.empty) return;
+    const d = snap.docs[0].data();
+    if (d.details) renderFullTable(d.details);
   });
 });
 
@@ -415,6 +477,39 @@ function renderDashboard(data) {
     applyHighlight();
   });
 }
+
+const FULL_TABLE_COLUMNS = ['Pts','LT','PE','RCGZ','RCG','RC','IP','SP','OP','OU','EE','GA','GV','GP','GE','PU','PX'];
+
+function renderFullTable(details) {
+  const participants = Object.keys(details).sort((a,b) => (details[b].Pts ?? 0) - (details[a].Pts ?? 0));
+
+  const head = document.getElementById('fullTableHead');
+  head.innerHTML = '<th class="rank-cell">#</th><th>Nome</th>' +
+    FULL_TABLE_COLUMNS.map(c => `<th>${c}</th>`).join('');
+
+  const body = document.getElementById('fullTableBody');
+  body.innerHTML = participants.map((p, i) => {
+    const row = details[p];
+    return `<tr>
+      <td>${i + 1}º</td>
+      <td>${p}</td>
+      ${FULL_TABLE_COLUMNS.map(c => `<td>${row[c] ?? ''}</td>`).join('')}
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('tabBtnDashboard').addEventListener('click', () => {
+  document.getElementById('tabBtnDashboard').classList.add('active');
+  document.getElementById('tabBtnFull').classList.remove('active');
+  document.getElementById('tabDashboard').classList.remove('hidden');
+  document.getElementById('tabFullTable').classList.add('hidden');
+});
+document.getElementById('tabBtnFull').addEventListener('click', () => {
+  document.getElementById('tabBtnFull').classList.add('active');
+  document.getElementById('tabBtnDashboard').classList.remove('active');
+  document.getElementById('tabFullTable').classList.remove('hidden');
+  document.getElementById('tabDashboard').classList.add('hidden');
+});
 
 function fmtDate(d) {
   const hasTime = d.includes('T');
