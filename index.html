@@ -461,7 +461,10 @@ function renderDashboard(data) {
   currentDates = dates;
   zoomedIndex = null;
   const lastDate = dates[dates.length - 1];
-  const participants = Object.keys(data[lastDate]).sort((a,b) => data[lastDate][b] - data[lastDate][a]);
+  const participants = Object.keys(data[lastDate]).sort((a, b) => {
+    if (latestDetails) return compareByTiebreak(a, b, latestDetails);
+    return data[lastDate][b] - data[lastDate][a];
+  });
   currentParticipants = participants;
 
   document.getElementById('updatedAt').textContent = `Última coleta: ${fmtFull(lastDate)}`;
@@ -654,12 +657,26 @@ document.getElementById('btnTop5').addEventListener('click', () => {
 
 const FULL_TABLE_COLUMNS = ['Pts','LT','PE','RCGZ','RCG','RC','IP','SP','OP','OU','EE','GA','GV','GP','GE','PU','PX'];
 
+// Ordem oficial de critérios de desempate do bolão (do site original).
+const TIEBREAK_FIELDS = ['Pts','LT','PE','RCG','RCGZ','RC','OU','EE','OP','IP','SP','GA','GV','GP','GE'];
+
+function compareByTiebreak(a, b, details) {
+  const da = details[a] || {};
+  const db = details[b] || {};
+  for (const field of TIEBREAK_FIELDS) {
+    const diff = (db[field] ?? 0) - (da[field] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 let latestDetails = null;
 let fullTableSort = { col: 'Pts', dir: 'desc' };
 
 function renderFullTable(details) {
   latestDetails = details;
   drawFullTable();
+  if (latestHistoryData) renderDashboard(latestHistoryData);
 }
 
 function drawFullTable() {
@@ -670,6 +687,9 @@ function drawFullTable() {
   const participants = Object.keys(details).sort((a, b) => {
     if (col === 'Nome') {
       return dir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+    }
+    if (col === 'Pts' && dir === 'desc') {
+      return compareByTiebreak(a, b, details);
     }
     const va = details[a][col] ?? -Infinity;
     const vb = details[b][col] ?? -Infinity;
