@@ -257,7 +257,7 @@
     <div class="wrap">
       <div class="card">
         <h2>Trajetória de pontos</h2>
-        <div class="hint" id="dashboardHint">Clique em um nome na tabela ao lado para destacar a linha. Clique em um ponto do gráfico para dar zoom nele; clique de novo no mesmo ponto para voltar. A coleta roda a cada 5 minutos e a tela atualiza sozinha, em tempo real, assim que um novo dado chega.</div>
+        <div class="hint" id="dashboardHint">Clique em um nome na tabela ao lado para destacar a linha. Clique em um ponto do gráfico para dar zoom nele; clique de novo no mesmo ponto para voltar. A coleta roda a cada 1 minuto e a tela atualiza sozinha, em tempo real, assim que um novo dado chega.</div>
         <div class="controls">
           <button id="btnAll">Mostrar todos</button>
           <button id="btnTop5">Somente Top 5</button>
@@ -319,7 +319,7 @@
     </div>
   </div>
 
-  <footer>Dados extraídos automaticamente do ranking do bolão a cada 5 minutos · acesso restrito.</footer>
+  <footer>Dados extraídos automaticamente do ranking do bolão a cada 1 minuto · acesso restrito.</footer>
 </div>
 
 <script type="module">
@@ -621,7 +621,7 @@ function setCompareMode(on) {
   document.getElementById('btnCompareToggle').classList.toggle('active', on);
   document.getElementById('dashboardHint').textContent = on
     ? 'Clique em quantos participantes quiser na tabela ao lado para comparar as trajetórias juntas. Clique em um ponto do gráfico para dar zoom.'
-    : 'Clique em um nome na tabela ao lado para destacar a linha. Clique em um ponto do gráfico para dar zoom nele; clique de novo no mesmo ponto para voltar. A coleta roda a cada 5 minutos e a tela atualiza sozinha, em tempo real, assim que um novo dado chega.';
+    : 'Clique em um nome na tabela ao lado para destacar a linha. Clique em um ponto do gráfico para dar zoom nele; clique de novo no mesmo ponto para voltar. A coleta roda a cada 1 minuto e a tela atualiza sozinha, em tempo real, assim que um novo dado chega.';
   if (on) {
     highlighted = null;
   } else {
