@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAllowed() {
+      return request.auth != null &&
+        request.auth.token.email in
+          get(/databases/$(database)/documents/config/access).data.allowedEmails;
+    }
+
+    // Snapshots do ranking: só usuários autorizados leem.
+    // Escrita só acontece via Admin SDK (GitHub Actions), que ignora estas regras.
+    match /snapshots/{doc} {
+      allow read: if isAllowed();
+      allow write: if false;
+    }
+
+    // Lista de e-mails autorizados: ninguém lê/escreve pelo cliente.
+    match /config/{doc} {
+      allow read: if false;
+      allow write: if false;
+    }
+  }
+}
