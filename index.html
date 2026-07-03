@@ -115,6 +115,8 @@
   tbody tr { cursor: pointer; transition: background .12s ease; }
   tbody tr:hover { background: rgba(79,209,197,0.08); }
   tbody tr.dimmed { opacity: 0.35; }
+  tbody tr.selected-row { background: rgba(79,209,197,0.12); }
+  tbody tr.selected-row .name-cell { font-weight: 700; color: var(--accent); }
   .rank-cell { width: 28px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .rank-1 { color: var(--gold); font-weight: 700; }
   .rank-2 { color: var(--silver); font-weight: 700; }
@@ -246,6 +248,7 @@
 
   <div class="tabbar">
     <button class="tab-btn active" id="tabBtnDashboard">Dashboard</button>
+    <button class="tab-btn" id="tabBtnCompare">Comparar</button>
     <button class="tab-btn" id="tabBtnFull">Tabela completa</button>
   </div>
 
@@ -273,6 +276,34 @@
               <tr><th class="rank-cell">#</th><th>Participante</th><th style="text-align:right">Pts</th></tr>
             </thead>
             <tbody id="rankBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabCompare" class="hidden">
+    <div class="wrap">
+      <div class="card">
+        <h2>Comparação</h2>
+        <div class="hint">Clique em quantos participantes quiser na lista ao lado — todos os selecionados aparecem juntos no gráfico.</div>
+        <div class="controls">
+          <button id="btnCompareClear">Limpar seleção</button>
+        </div>
+        <div class="chart-box">
+          <canvas id="compareChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Selecionar participantes</h2>
+        <div class="hint" id="compareHint">Ninguém selecionado — clique para escolher</div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th class="rank-cell">#</th><th>Participante</th><th style="text-align:right">Pts</th></tr>
+            </thead>
+            <tbody id="compareBody"></tbody>
           </table>
         </div>
       </div>
@@ -433,22 +464,26 @@ function startListeners() {
   });
 }
 
+const PALETTE = [
+  '#4fd1c5','#f4c542','#f87171','#818cf8','#fb923c','#34d399','#e879f9',
+  '#60a5fa','#facc15','#f472b6','#a3e635','#fb7185','#38bdf8','#c084fc',
+  '#fbbf24','#4ade80','#f97316','#94a3b8','#22d3ee'
+];
+
 let chartInstance = null;
+let latestHistoryData = null;
+let colorOf = {};
 
 function renderDashboard(data) {
+  latestHistoryData = data;
   const dates = Object.keys(data).sort();
   const lastDate = dates[dates.length - 1];
   const participants = Object.keys(data[lastDate]).sort((a,b) => data[lastDate][b] - data[lastDate][a]);
 
   document.getElementById('updatedAt').textContent = `Última coleta: ${fmtFull(lastDate)}`;
 
-  const palette = [
-    '#4fd1c5','#f4c542','#f87171','#818cf8','#fb923c','#34d399','#e879f9',
-    '#60a5fa','#facc15','#f472b6','#a3e635','#fb7185','#38bdf8','#c084fc',
-    '#fbbf24','#4ade80','#f97316','#94a3b8','#22d3ee'
-  ];
-  const colorOf = {};
-  participants.forEach((p, i) => colorOf[p] = palette[i % palette.length]);
+  colorOf = {};
+  participants.forEach((p, i) => colorOf[p] = PALETTE[i % PALETTE.length]);
 
   const datasets = participants.map(p => ({
     label: p,
@@ -558,7 +593,102 @@ function renderDashboard(data) {
     chart.data.datasets.forEach(ds => ds.hidden = !top5.includes(ds.label));
     applyHighlight();
   });
+
+  renderCompareList(participants);
+  drawCompareChart();
 }
+
+let compareChartInstance = null;
+const selectedCompare = new Set();
+
+function renderCompareList(participants) {
+  const lastDate = Object.keys(latestHistoryData).sort().slice(-1)[0];
+  const body = document.getElementById('compareBody');
+  body.innerHTML = participants.map((p, i) => {
+    const pts = latestHistoryData[lastDate][p];
+    return `<tr data-name="${p}" class="${selectedCompare.has(p) ? 'selected-row' : ''}">
+      <td class="rank-cell">${i + 1}</td>
+      <td class="name-cell"><span class="swatch" style="background:${colorOf[p]}"></span>${p}</td>
+      <td class="pts-cell">${pts}</td>
+    </tr>`;
+  }).join('');
+
+  body.querySelectorAll('tr').forEach(row => {
+    row.addEventListener('click', () => {
+      const name = row.dataset.name;
+      if (selectedCompare.has(name)) selectedCompare.delete(name);
+      else selectedCompare.add(name);
+      row.classList.toggle('selected-row');
+      updateCompareHint();
+      drawCompareChart();
+    });
+  });
+
+  updateCompareHint();
+}
+
+function updateCompareHint() {
+  const hint = document.getElementById('compareHint');
+  hint.textContent = selectedCompare.size === 0
+    ? 'Ninguém selecionado — clique para escolher'
+    : `${selectedCompare.size} participante(s) selecionado(s)`;
+}
+
+function drawCompareChart() {
+  if (!latestHistoryData) return;
+  const dates = Object.keys(latestHistoryData).sort();
+
+  const datasets = [...selectedCompare].map(p => ({
+    label: p,
+    data: dates.map(d => latestHistoryData[d][p] ?? null),
+    borderColor: colorOf[p],
+    backgroundColor: colorOf[p],
+    pointRadius: 0,
+    pointHoverRadius: 5,
+    borderWidth: 3,
+    tension: 0.25,
+    fill: false,
+  }));
+
+  if (compareChartInstance) {
+    compareChartInstance.destroy();
+    compareChartInstance = null;
+  }
+
+  const ctx = document.getElementById('compareChart').getContext('2d');
+  compareChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates.map(fmtDate), datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        legend: { display: selectedCompare.size > 0, labels: { color: '#c9d1e6' } },
+        tooltip: {
+          backgroundColor: '#1c2438',
+          borderColor: '#2a3350',
+          borderWidth: 1,
+          titleColor: '#e8ecf5',
+          bodyColor: '#c9d1e6',
+          padding: 10,
+          callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y} pts` }
+        }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8b96b3', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+        y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#8b96b3' } }
+      }
+    }
+  });
+}
+
+document.getElementById('btnCompareClear').addEventListener('click', () => {
+  selectedCompare.clear();
+  document.querySelectorAll('#compareBody tr').forEach(row => row.classList.remove('selected-row'));
+  updateCompareHint();
+  drawCompareChart();
+});
 
 const FULL_TABLE_COLUMNS = ['Pts','LT','PE','RCGZ','RCG','RC','IP','SP','OP','OU','EE','GA','GV','GP','GE','PU','PX'];
 
@@ -614,18 +744,23 @@ document.getElementById('fullTableHead').addEventListener('click', (e) => {
   drawFullTable();
 });
 
-document.getElementById('tabBtnDashboard').addEventListener('click', () => {
-  document.getElementById('tabBtnDashboard').classList.add('active');
-  document.getElementById('tabBtnFull').classList.remove('active');
-  document.getElementById('tabDashboard').classList.remove('hidden');
-  document.getElementById('tabFullTable').classList.add('hidden');
-});
-document.getElementById('tabBtnFull').addEventListener('click', () => {
-  document.getElementById('tabBtnFull').classList.add('active');
-  document.getElementById('tabBtnDashboard').classList.remove('active');
-  document.getElementById('tabFullTable').classList.remove('hidden');
-  document.getElementById('tabDashboard').classList.add('hidden');
-});
+const TABS = {
+  dashboard: { btn: 'tabBtnDashboard', panel: 'tabDashboard' },
+  compare: { btn: 'tabBtnCompare', panel: 'tabCompare' },
+  full: { btn: 'tabBtnFull', panel: 'tabFullTable' },
+};
+
+function showTab(name) {
+  for (const key in TABS) {
+    const isActive = key === name;
+    document.getElementById(TABS[key].btn).classList.toggle('active', isActive);
+    document.getElementById(TABS[key].panel).classList.toggle('hidden', !isActive);
+  }
+}
+
+document.getElementById('tabBtnDashboard').addEventListener('click', () => showTab('dashboard'));
+document.getElementById('tabBtnCompare').addEventListener('click', () => showTab('compare'));
+document.getElementById('tabBtnFull').addEventListener('click', () => showTab('full'));
 
 function fmtDate(d) {
   const hasTime = d.includes('T');
