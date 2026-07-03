@@ -155,6 +155,8 @@
   .full-table th:nth-child(1), .full-table td:nth-child(1) { text-align: center; }
   .full-table th:nth-child(2), .full-table td:nth-child(2) { text-align: left; white-space: normal; }
   .full-table tbody tr:hover { background: rgba(79,209,197,0.06); }
+  .full-table .sortable-th { cursor: pointer; user-select: none; }
+  .full-table .sortable-th:hover { color: var(--accent); }
   .legend {
     margin-top: 16px;
     padding-top: 14px;
@@ -511,12 +513,34 @@ function renderDashboard(data) {
 
 const FULL_TABLE_COLUMNS = ['Pts','LT','PE','RCGZ','RCG','RC','IP','SP','OP','OU','EE','GA','GV','GP','GE','PU','PX'];
 
+let latestDetails = null;
+let fullTableSort = { col: 'Pts', dir: 'desc' };
+
 function renderFullTable(details) {
-  const participants = Object.keys(details).sort((a,b) => (details[b].Pts ?? 0) - (details[a].Pts ?? 0));
+  latestDetails = details;
+  drawFullTable();
+}
+
+function drawFullTable() {
+  if (!latestDetails) return;
+  const details = latestDetails;
+  const { col, dir } = fullTableSort;
+
+  const participants = Object.keys(details).sort((a, b) => {
+    if (col === 'Nome') {
+      return dir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+    }
+    const va = details[a][col] ?? -Infinity;
+    const vb = details[b][col] ?? -Infinity;
+    return dir === 'asc' ? va - vb : vb - va;
+  });
 
   const head = document.getElementById('fullTableHead');
-  head.innerHTML = '<th class="rank-cell">#</th><th>Nome</th>' +
-    FULL_TABLE_COLUMNS.map(c => `<th>${c}</th>`).join('');
+  const headCols = [{ key: 'Nome', label: 'Nome' }, ...FULL_TABLE_COLUMNS.map(c => ({ key: c, label: c }))];
+  head.innerHTML = '<th class="rank-cell">#</th>' + headCols.map(({ key, label }) => {
+    const arrow = col === key ? (dir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<th class="sortable-th" data-col="${key}">${label}${arrow}</th>`;
+  }).join('');
 
   const body = document.getElementById('fullTableBody');
   body.innerHTML = participants.map((p, i) => {
@@ -528,6 +552,18 @@ function renderFullTable(details) {
     </tr>`;
   }).join('');
 }
+
+document.getElementById('fullTableHead').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-col]');
+  if (!th) return;
+  const col = th.dataset.col;
+  if (fullTableSort.col === col) {
+    fullTableSort.dir = fullTableSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    fullTableSort = { col, dir: col === 'Nome' ? 'asc' : 'desc' };
+  }
+  drawFullTable();
+});
 
 document.getElementById('tabBtnDashboard').addEventListener('click', () => {
   document.getElementById('tabBtnDashboard').classList.add('active');
