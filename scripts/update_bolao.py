@@ -103,9 +103,11 @@ def main():
         .limit(1)
         .get()
     )
-    last_points = last_q[0].to_dict().get("points") if last_q else None
+    last_doc = last_q[0].to_dict() if last_q else None
+    last_points = last_doc.get("points") if last_doc else None
+    last_has_details = bool(last_doc.get("details")) if last_doc else False
 
-    if last_points == points:
+    if last_points == points and last_has_details:
         log("Sem mudanças desde a última coleta.")
         return
 
