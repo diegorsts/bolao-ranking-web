@@ -562,7 +562,7 @@ function handleChartZoomClick(idx) {
     delete chartInstance.options.scales.x.max;
   } else {
     zoomedIndex = idx;
-    const windowSize = 5;
+    const windowSize = 2;
     const from = Math.max(0, idx - windowSize);
     const to = Math.min(currentDates.length - 1, idx + windowSize);
     chartInstance.options.scales.x.min = chartInstance.data.labels[from];
