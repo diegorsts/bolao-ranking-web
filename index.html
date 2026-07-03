@@ -155,6 +155,18 @@
   .full-table th:nth-child(1), .full-table td:nth-child(1) { text-align: center; }
   .full-table th:nth-child(2), .full-table td:nth-child(2) { text-align: left; white-space: normal; }
   .full-table tbody tr:hover { background: rgba(79,209,197,0.06); }
+  .legend {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .legend b { color: var(--text); }
 
   #gate {
     min-height: 70vh;
@@ -261,6 +273,25 @@
           </thead>
           <tbody id="fullTableBody"></tbody>
         </table>
+      </div>
+      <div class="legend">
+        <span><b>Pts</b>=Total de Pontos</span>
+        <span><b>LT</b>=Acertos na Lata</span>
+        <span><b>PE</b>=Placar Exato</span>
+        <span><b>RCGZ</b>=Placar Errado, Resultado Certo e Acertou Gol de um dos Times (Incluindo Zero)</span>
+        <span><b>RCG</b>=Placar Errado, Resultado Certo e Acertou Gol de um dos Times (Excluindo Zero)</span>
+        <span><b>RC</b>=Placar Errado e Resultado Certo</span>
+        <span><b>IP</b>=Participação, Incluiu Palpite</span>
+        <span><b>SP</b>=Sem Palpite</span>
+        <span><b>OP</b>=Placar Oposto</span>
+        <span><b>OU</b>=Placar Ousado</span>
+        <span><b>EE</b>=Empate com Placar Errado</span>
+        <span><b>GA</b>=Acerto de Gol</span>
+        <span><b>GV</b>=Acertou o Gol do Vencedor</span>
+        <span><b>GP</b>=Acertou o Gol do Perdedor</span>
+        <span><b>GE</b>=Acertou o Gol com o Placar Errado</span>
+        <span><b>PU</b>=Atribuir Pontos para Usuário</span>
+        <span><b>PX</b>=Ponto Extra</span>
       </div>
     </div>
   </div>
