@@ -195,6 +195,17 @@
     gap: 10px;
   }
   .google-btn:hover { opacity: 0.9; }
+  .passcode-form { display: flex; gap: 8px; }
+  .passcode-form input {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14.5px;
+    width: 220px;
+  }
+  .passcode-form input:focus { outline: none; border-color: var(--accent); }
   .hidden { display: none !important; }
   .error-box {
     color: #f87171;
@@ -212,8 +223,12 @@
 <div id="gate">
   <h1>Bolão <span>Support</span></h1>
   <h2 id="gateTitle">Faça login para ver o ranking</h2>
-  <p>Este painel é privado. Só usuários autorizados conseguem ver os dados.</p>
-  <button class="google-btn" id="loginBtn">Entrar com Google</button>
+  <p id="gateText">Este painel é privado. Faça login com o Google e informe a senha de acesso.</p>
+  <button class="google-btn hidden" id="loginBtn">Entrar com Google</button>
+  <form id="passcodeForm" class="passcode-form hidden">
+    <input type="password" id="passcodeInput" placeholder="Senha de acesso" autocomplete="off" />
+    <button type="submit" class="google-btn">Entrar</button>
+  </form>
   <div id="errorBox" class="error-box hidden"></div>
 </div>
 
@@ -307,7 +322,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, query, orderBy, onSnapshot, limit
+  getFirestore, collection, query, orderBy, onSnapshot, limit, getDocs, doc, setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Config pública do Firebase — não é segredo, a segurança vem das Firestore Rules.
@@ -329,8 +344,12 @@ const gate = document.getElementById('gate');
 const appEl = document.getElementById('app');
 const errorBox = document.getElementById('errorBox');
 const gateTitle = document.getElementById('gateTitle');
+const gateText = document.getElementById('gateText');
+const loginBtn = document.getElementById('loginBtn');
+const passcodeForm = document.getElementById('passcodeForm');
+const passcodeInput = document.getElementById('passcodeInput');
 
-document.getElementById('loginBtn').addEventListener('click', () => {
+loginBtn.addEventListener('click', () => {
   errorBox.classList.add('hidden');
   signInWithPopup(auth, provider).catch(err => {
     errorBox.textContent = 'Erro ao entrar: ' + err.message;
@@ -340,6 +359,21 @@ document.getElementById('loginBtn').addEventListener('click', () => {
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
 
+passcodeForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const val = passcodeInput.value.trim();
+  if (!val || !auth.currentUser) return;
+  errorBox.classList.add('hidden');
+  try {
+    await setDoc(doc(db, 'sessions', auth.currentUser.uid), { enteredPasscode: val });
+    passcodeInput.value = '';
+    tryEnterApp();
+  } catch (err) {
+    errorBox.textContent = 'Senha incorreta. Tente novamente.';
+    errorBox.classList.remove('hidden');
+  }
+});
+
 let unsubscribeSnapshot = null;
 let unsubscribeLatest = null;
 
@@ -348,14 +382,38 @@ onAuthStateChanged(auth, (user) => {
   if (unsubscribeLatest) { unsubscribeLatest(); unsubscribeLatest = null; }
 
   if (!user) {
+    gateTitle.textContent = 'Faça login para ver o ranking';
+    gateText.textContent = 'Este painel é privado. Faça login com o Google e informe a senha de acesso.';
+    loginBtn.classList.remove('hidden');
+    passcodeForm.classList.add('hidden');
+    errorBox.classList.add('hidden');
     gate.classList.remove('hidden');
     appEl.classList.add('hidden');
     return;
   }
 
-  gateTitle.textContent = 'Faça login para ver o ranking';
-  errorBox.classList.add('hidden');
+  loginBtn.classList.add('hidden');
+  tryEnterApp();
+});
 
+async function tryEnterApp() {
+  errorBox.classList.add('hidden');
+  try {
+    await getDocs(query(collection(db, 'snapshots'), orderBy('ts', 'desc'), limit(1)));
+    passcodeForm.classList.add('hidden');
+    startListeners();
+    gate.classList.add('hidden');
+    appEl.classList.remove('hidden');
+  } catch (err) {
+    gateTitle.textContent = 'Digite a senha de acesso';
+    gateText.textContent = `Login feito com ${auth.currentUser.email}. Agora informe a senha do bolão.`;
+    passcodeForm.classList.remove('hidden');
+    gate.classList.remove('hidden');
+    appEl.classList.add('hidden');
+  }
+}
+
+function startListeners() {
   const q = query(collection(db, 'snapshots'), orderBy('ts', 'asc'));
   unsubscribeSnapshot = onSnapshot(q, (snap) => {
     const data = {};
@@ -364,16 +422,7 @@ onAuthStateChanged(auth, (user) => {
       data[d.label] = d.points;
     });
     if (Object.keys(data).length === 0) return;
-
     renderDashboard(data);
-    gate.classList.add('hidden');
-    appEl.classList.remove('hidden');
-  }, (err) => {
-    gateTitle.textContent = 'Acesso não autorizado';
-    errorBox.textContent = `Sua conta (${user.email}) não tem permissão para ver este painel.`;
-    errorBox.classList.remove('hidden');
-    gate.classList.remove('hidden');
-    appEl.classList.add('hidden');
   });
 
   const qLatest = query(collection(db, 'snapshots'), orderBy('ts', 'desc'), limit(1));
@@ -382,7 +431,7 @@ onAuthStateChanged(auth, (user) => {
     const d = snap.docs[0].data();
     if (d.details) renderFullTable(d.details);
   });
-});
+}
 
 let chartInstance = null;
 

@@ -3,23 +3,32 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAllowed() {
+    // A senha real nunca é lida diretamente pelo cliente (allow read: if false).
+    // Só as próprias regras conseguem lê-la via get(), para comparar no servidor.
+    function passcodeValida(uid) {
       return request.auth != null &&
-        request.auth.token.email in
-          get(/databases/$(database)/documents/config/access).data.allowedEmails;
+        exists(/databases/$(database)/documents/sessions/$(uid)) &&
+        get(/databases/$(database)/documents/sessions/$(uid)).data.enteredPasscode ==
+          get(/databases/$(database)/documents/config/passcode).data.value;
     }
 
-    // Snapshots do ranking: só usuários autorizados leem.
-    // Escrita só acontece via Admin SDK (GitHub Actions), que ignora estas regras.
     match /snapshots/{doc} {
-      allow read: if isAllowed();
+      allow read: if passcodeValida(request.auth.uid);
       allow write: if false;
     }
 
-    // Lista de e-mails autorizados: ninguém lê/escreve pelo cliente.
     match /config/{doc} {
       allow read: if false;
       allow write: if false;
+    }
+
+    // Cada usuário só pode ler/gravar a própria sessão.
+    // A gravação só é aceita se a senha enviada bater com a senha real guardada em config/passcode.
+    match /sessions/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid &&
+        request.resource.data.enteredPasscode ==
+          get(/databases/$(database)/documents/config/passcode).data.value;
     }
   }
 }
