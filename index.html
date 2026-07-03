@@ -187,7 +187,7 @@
   <div class="wrap">
     <div class="card">
       <h2>Trajetória de pontos</h2>
-      <div class="hint">Clique em um nome na tabela ao lado para destacar a linha. Os dados são atualizados automaticamente a cada 15 minutos.</div>
+      <div class="hint">Clique em um nome na tabela ao lado para destacar a linha. A coleta roda a cada 5 minutos e a tela atualiza sozinha, em tempo real, assim que um novo dado chega.</div>
       <div class="controls">
         <button id="btnAll">Mostrar todos</button>
         <button id="btnTop5">Somente Top 5</button>
@@ -212,7 +212,7 @@
     </div>
   </div>
 
-  <footer>Dados extraídos automaticamente do ranking do bolão a cada 15 minutos · acesso restrito.</footer>
+  <footer>Dados extraídos automaticamente do ranking do bolão a cada 5 minutos · acesso restrito.</footer>
 </div>
 
 <script type="module">
@@ -221,17 +221,17 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, query, orderBy, getDocs
+  getFirestore, collection, query, orderBy, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Config pública do Firebase — não é segredo, a segurança vem das Firestore Rules.
 const firebaseConfig = {
-  apiKey: "SEU_API_KEY",
-  authDomain: "SEU_PROJECT_ID.firebaseapp.com",
-  projectId: "SEU_PROJECT_ID",
-  storageBucket: "SEU_PROJECT_ID.appspot.com",
-  messagingSenderId: "SEU_SENDER_ID",
-  appId: "SEU_APP_ID"
+  apiKey: "AIzaSyD6J5Uk8GsTukm5-jNhxoq71kJ3l47durk",
+  authDomain: "bolao-ranking-f045c.firebaseapp.com",
+  projectId: "bolao-ranking-f045c",
+  storageBucket: "bolao-ranking-f045c.firebasestorage.app",
+  messagingSenderId: "423000761333",
+  appId: "1:423000761333:web:e98bafc18120ca6f43b6bc"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -254,39 +254,42 @@ document.getElementById('loginBtn').addEventListener('click', () => {
 
 document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
 
-onAuthStateChanged(auth, async (user) => {
+let unsubscribeSnapshot = null;
+
+onAuthStateChanged(auth, (user) => {
+  if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+
   if (!user) {
     gate.classList.remove('hidden');
     appEl.classList.add('hidden');
     return;
   }
-  try {
-    await loadAndRender();
+
+  gateTitle.textContent = 'Faça login para ver o ranking';
+  errorBox.classList.add('hidden');
+
+  const q = query(collection(db, 'snapshots'), orderBy('ts', 'asc'));
+  unsubscribeSnapshot = onSnapshot(q, (snap) => {
+    const data = {};
+    snap.forEach(doc => {
+      const d = doc.data();
+      data[d.label] = d.points;
+    });
+    if (Object.keys(data).length === 0) return;
+
+    renderDashboard(data);
     gate.classList.add('hidden');
     appEl.classList.remove('hidden');
-  } catch (err) {
+  }, (err) => {
     gateTitle.textContent = 'Acesso não autorizado';
     errorBox.textContent = `Sua conta (${user.email}) não tem permissão para ver este painel.`;
     errorBox.classList.remove('hidden');
     gate.classList.remove('hidden');
     appEl.classList.add('hidden');
-  }
+  });
 });
 
-async function loadAndRender() {
-  const q = query(collection(db, 'snapshots'), orderBy('ts', 'asc'));
-  const snap = await getDocs(q);
-
-  const data = {};
-  snap.forEach(doc => {
-    const d = doc.data();
-    data[d.label] = d.points;
-  });
-
-  if (Object.keys(data).length === 0) throw new Error('Sem dados ainda.');
-
-  renderDashboard(data);
-}
+let chartInstance = null;
 
 function renderDashboard(data) {
   const dates = Object.keys(data).sort();
@@ -315,6 +318,11 @@ function renderDashboard(data) {
     fill: false,
   }));
 
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
   const ctx = document.getElementById('rankChart').getContext('2d');
   const chart = new Chart(ctx, {
     type: 'line',
@@ -341,6 +349,7 @@ function renderDashboard(data) {
       }
     }
   });
+  chartInstance = chart;
 
   const rankBody = document.getElementById('rankBody');
   let highlighted = null;
@@ -365,6 +374,7 @@ function renderDashboard(data) {
     row.addEventListener('click', () => {
       const name = row.dataset.name;
       highlighted = (highlighted === name) ? null : name;
+      chart.data.datasets.forEach(ds => ds.hidden = false);
       applyHighlight();
     });
   });
@@ -402,8 +412,6 @@ function renderDashboard(data) {
     chart.data.datasets.forEach(ds => ds.hidden = !top5.includes(ds.label));
     chart.update();
   });
-
-  setTimeout(() => location.reload(), 5 * 60 * 1000);
 }
 
 function fmtDate(d) {
