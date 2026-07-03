@@ -548,9 +548,16 @@ function applyChartStyle() {
   if (!chartInstance) return;
   chartInstance.data.datasets.forEach(ds => {
     if (compareMode) {
-      ds.hidden = selectedCompare.size === 0 || !selectedCompare.has(ds.label);
-      ds.borderWidth = 3;
-      ds.borderColor = colorOf[ds.label];
+      ds.hidden = false;
+      if (selectedCompare.size === 0) {
+        ds.borderWidth = 1;
+        ds.borderColor = colorOf[ds.label] + '22';
+      } else if (selectedCompare.has(ds.label)) {
+        ds.borderWidth = 3;
+        ds.borderColor = colorOf[ds.label];
+      } else {
+        ds.hidden = true;
+      }
     } else {
       if (!highlighted) {
         ds.borderWidth = ds.label === currentParticipants[0] ? 3.5 : 2;
